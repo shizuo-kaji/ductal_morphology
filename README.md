@@ -10,14 +10,27 @@ MIT Licence
 ### Requirements
 - python 3: [Anaconda](https://anaconda.org) is recommended
 - Jupter Notebook
+- Dependent packages: install by
+``` 
+pip install -U git+https://github.com/shizuo-kaji/CubicalRipser_3dim
+pip install scikit-fmm pynrrd persim skan
+```
 
 ## Description
 - Open ductal_morphology.ipynb in Jupter Notebook, and follow the instruction.
-- The code computes the two metrics described in the paper (treeH and radialH), and provides their visualisation in the form of labeled volume.
+- The code computes the two metrics described in the paper (treeH and radialH), and provides their visualisation in the form of labeled volumes.
 - treeH computes the persistent homology of the geodesic distance from the specified origin of the ductal structure, quantifying the complexity in the longitudinal direction.
 - radialH computes the persistent homology of the distance from the skeleton of the ductal structure, quantifying the irregularities in the radial direction.
-- Prepare a 3D volumetric image containing the ductal structure to be analysed.
-The code assumes the 3D image is given in the numpy array.
-If you are not sure, it is recommended to prepare the image in the NRRD format so that the example code (with the included test.nrrd) works as it is.
-- The algorithm takes a binary 3D volume as input. The loaded 3D image will be binarised by a simple thresholding.
+- Prepare a 3D volumetric image containing the segmented ductal structure to be analysed.
+The code assumes the 3D image is given in the form of 3D numpy array.
+If you are not sure, it is recommended to prepare the image in the NRRD format (as the included Test01.nrrd) so that the example code works as it is.
 
+### Flow
+- The algorithm takes a 3D volumetric image as input. The loaded 3D image will be binarised by a simple thresholding.
+- The skeletal graph structure is computed from the skeletonised binarised volume.
+- The "origin" (trachea carina) is identified as the degree three node connected to the leaf with the minimum z-coordinate (which is assumed to be closest to the mouth).
+- The generation numbers are computed according to the graph distance from the origin.
+- The skeletal tree is the minimum spanning tree of the skeletal graph minus those nodes from the origin to the mouth.
+- The ductal volume corresponding to the skeletal tree is computed (roughly, the original volume minus those voxels in trachea or forming cycles)
+- Two types of distance transform are applied to the ductal volume, and their persistent homologies are computed.
+- In addition, volumed annotated with PH cycles are produced.
