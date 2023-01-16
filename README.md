@@ -25,7 +25,7 @@ pip install scikit-fmm pynrrd persim skan
 The code assumes the 3D image is given in the form of 3D numpy array.
 If you are not sure, it is recommended to prepare the image in the NRRD format (as the included Test01.nrrd) so that the example code works as it is.
 
-### Flow
+### Flow of the algorithm
 - The algorithm takes a 3D volumetric image as input. The loaded 3D image will be binarised by a simple thresholding.
 - The skeletal graph structure is computed from the skeletonised binarised volume.
 - The "origin" (trachea carina) is identified as the degree three node connected to the leaf with the minimum z-coordinate (which is assumed to be closest to the mouth).
