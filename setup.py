@@ -7,7 +7,7 @@ setuptools.setup(
     name="ductal_morphology",
     version="0.0.1",
     install_requires=[
-        "numpy","skimage","skfmm","nrrd","matplotlib","scipy","skan","networkx","seaborn","persim"
+        "numpy","scikit-image","scikit-fmm","pynrrd","matplotlib","scipy","skan","networkx","seaborn","persim"
     ],
     author="Shizuo Kaji",
     author_email="skaji@imi.kyushu-u.ac.jp",
