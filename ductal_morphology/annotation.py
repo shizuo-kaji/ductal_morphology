@@ -33,7 +33,7 @@ def ascending_flood(img,seed_point,tol=0, lo=-1000, high=1000):
 def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot_type, annot_metric, min_life=[], max_life=[], num_bins=[], verbosity=0, use_tqdm=True):
     out = binarised_volume.copy().astype(np.uint8)
     vol = out.sum()
-    dist_vol = geodesic_distance_transform(skeleton,binarised_volume,origin,restrict_to_centerline=False)
+    dist_vol = geodesic_distance_transform(skeleton,binarised_volume,origin)
     if mode=="radial":
         tol = 0
     else:
@@ -43,7 +43,7 @@ def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot
     char_cycles = []
     for i in range(num_bins[mode]):
         if annot_metric == "birth":
-            char_cycles.append({'dim':0, 'b0':-metrics[f"{mode}_Birth_bin{i+1}"], 'b1':-metrics[f"{mode}_Birth_bin{i}"], 'l0':min_life[mode], 'l1':max_life[mode], 'col': i+2 })
+            char_cycles.append({'dim':0, 'b0':-metrics[f"{mode}_Birth_bin{i+1}"], 'b1':-metrics[f"{mode}_Birth_bin{i}"], 'l0':-np.inf, 'l1':np.inf, 'col': i+2 })
         elif annot_metric == "life":
             char_cycles.append({'dim':0, 'l0':metrics[f"{mode}_Life_bin{i}"], 'l1':metrics[f"{mode}_Life_bin{i+1}"], 'b0':-np.inf, 'b1':np.inf, 'col': i+2 })
         elif annot_metric == "ratio":

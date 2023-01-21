@@ -12,7 +12,7 @@ from genericpath import isfile
 import skan
 import networkx as nx
 from tqdm.auto import tqdm
-
+import pandas as pd
 
 # find fattest node ID and its coorrdinates
 def fattest_node(skeleton_img,mask,skel):
@@ -172,18 +172,22 @@ def removed_deg2_nodes(skeleton_MST, carina_id, leaf_removal_max_generation=3, v
     return(skeleton_MST,gens)
 
 #
-def create_generation_volumes(volume,skeletonize_method=None, graph_creation="networkx", threshold=-2000, min_branch_children=20, min_branch_separation=0, remove_trachea=True, verbosity=0):
+def create_generation_volumes(volume,skeletonize_method=None, graph_creation="networkx", threshold=-2000, min_branch_children=20,remove_trachea=True, verbosity=0):
     """Computes 3d array whose values indicate generation numbers
 
     Args:
         volume (float numpy 3d array): airway CT volume
-
+        skeletonize_method (str): this is passed to skimage.morphology.skeletonize
+        threshold (float): threshold CT value for binarising the volume
+        min_branch_children (int): branching points of small generations with children nodes smaller than this number will be excluded
+        remove_trachea (bool): flag to remove autodetected trachea regions 
+        verbosity (int): debug output
     Returns:
-        skeleton_generation
-        volume_generation
-        trachea_removed: 
+        skeleton_generation: volume containing the extracted airway skeleton with values having the generation number 
+        volume_generation: volume with voxels having the computed generation number
         origin (tuple(int,int,int)): the coordinate of the trachea carina
         ac_gens (dict): dictionary of {generation: airway counts in generation}
+        skeleton_MST (networkx.DiGraph): airway skeleton graph with branching points as nodes
     """
     ## represent airway tree struture as a weighted graph
     binarised_volume = binary_fill_holes(volume>threshold) # binarised airway volume
@@ -205,7 +209,7 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     skeleton_dt = distance_transform_edt(~skeleton_cleaned) # this will be compared to determine the voxels to be removed from the original volume
 
     ## identify trachea carina as the first deg>2 node with enough children
-    carina_id, trachea_nodes = find_trachea(skeleton_MST, min_branch_children=min_branch_children, min_branch_separation=min_branch_separation, verbosity=verbosity)
+    carina_id, trachea_nodes = find_trachea(skeleton_MST, min_branch_children=min_branch_children, verbosity=verbosity)
     if verbosity>0:
         print("Trachea Carina: ",carina_id,skeleton_MST.nodes[carina_id]['coords']," trachea vertices: ",[(k,skeleton_MST.nodes[k]['coords']) for k in trachea_nodes]) # skeleton_MST[k]
     ## construct the airway tree rooted at the trachea carina: remove vertices in trachea
@@ -255,10 +259,7 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
 
     ## compute trachea removed volume: those voxels having different distance from the original and the final tree centerlines will be removed
     skeleton_MST_dt,inds = distance_transform_edt(skeleton_generation==0,return_indices=True)
-    mask = (skeleton_dt != skeleton_MST_dt) ## regions to be removed
-    trachea_removed = volume.copy()
-    trachea_removed[mask] = volume.min()
-    binarised_volume = binary_fill_holes(trachea_removed>threshold) # binarised airway volume
+    binarised_volume = binary_fill_holes((skeleton_dt == skeleton_MST_dt) & binarised_volume)
 
     ## airway generation volume
     volume_generation=skeleton_generation[inds[0],inds[1],inds[2]].reshape(volume.shape)
@@ -266,19 +267,62 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     if skimage.measure.label(skeleton_generation>0).max()>1:
         print("the volume is disconnected!")
 
-    return(skeleton_generation,volume_generation,trachea_removed,origin,ac_gens,skeleton_MST)
+    return(skeleton_generation,volume_generation,origin,ac_gens,skeleton_MST)
 
+# compute the radius along the skeleton
+def skeleton_radius(skeleton,binarised_volume):
+    skeleton_dt,inds = distance_transform_edt(~skeleton,return_indices=True)
+    radius = np.zeros(binarised_volume.shape)
+    skeleton_dt=skeleton_dt[binarised_volume]
+    inds = inds[:,binarised_volume]
+    for d,z,y,x in zip(skeleton_dt.ravel(),inds[0].ravel(),inds[1].ravel(),inds[2].ravel()):
+        radius[z,y,x] = max(radius[z,y,x],d)
+    return(radius)
 
-# compute the signed distance from the origin and the centerline
-def geodesic_distance_transform(skeleton,binarised_volume,origin,outside_fill=1,restrict_to_centerline=True):
-    roi = np.ones(skeleton.shape)
-    roi[origin] = 0
-    # negative of geodesic distance transform: 0 means the voxel on the ROI, 1 means outside.
-    dist_vol = {"tree": (-skfmm.distance(np.ma.MaskedArray(roi,~binarised_volume))).filled(fill_value=outside_fill)}
-    dist_vol["radial"] = (-skfmm.distance(np.ma.MaskedArray(~skeleton,~binarised_volume))).filled(fill_value=outside_fill)
-    if restrict_to_centerline:
-        dist_vol["tree"][~skeleton]=outside_fill # restrict to the centerline
+# compute the geodesic disntance from the specified point or volume
+def distance_from_origin(binarised_volume,origin,fill_value=-1):
+    if len(origin) <=3:
+        roi = np.zeros(binarised_volume.shape, dtype=np.bool)
+        roi[origin] = 1
+    else:
+        roi = origin
+    return(skfmm.distance(np.ma.MaskedArray(~roi,~binarised_volume)).filled(fill_value=fill_value))
         
-    #dist_vol["tree"]=(-skfmm.distance(np.ma.MaskedArray(roi,~dilation(skeleton)))).filled(fill_value=OUTSIDE)
+# compute the signed distance from the origin and the centerline
+def geodesic_distance_transform(skeleton,binarised_volume,origin,outside_fill=1):
+    # negative of geodesic distance transform: 0 means the voxel on the ROI, 1 means outside.
+    dist_vol = {}
+    dist_vol["tree"] = -distance_from_origin(binarised_volume,origin,fill_value=-outside_fill)
+    dist_vol["radial"] = -distance_from_origin(binarised_volume,skeleton,fill_value=-outside_fill)
+    #dist_vol["skeleton"] = -distance_from_origin(dilation(skeleton),skeleton,fill_value=-outside_fill)
     return(dist_vol)
+
+# coefficient A of linear regression log(radius)= A distance + B for the airway skeleton
+def tapering_coeff(skeleton,binarised_volume,origin,min_radius=0):
+    import statsmodels.api as sm
+    radius = skeleton_radius(skeleton,binarised_volume)
+    distance = distance_from_origin(dilation(skeleton),origin)
+    mask = skeleton & (radius>min_radius)
+    df_rd = pd.DataFrame({'radius': radius[mask].ravel(), 'log_radius': np.log(radius[mask].ravel()), 'dist': distance[mask].ravel()})
+    model = sm.OLS(df_rd['log_radius'], sm.add_constant(df_rd['dist']))
+    res = model.fit()
+    return(df_rd,res.params[1], res.mse_resid)
+
+# box-couting dimension of a volume
+def box_counting_dim(binarised_volume):
+    counts=[]
+    sizes=[]
+    nonzero = np.nonzero(binarised_volume)
+    hz,hy,hx = binarised_volume.shape
+    size = 1
+    while(True):
+        H, _=np.histogramdd(nonzero, bins=(np.arange(0,hz+size,size),np.arange(0,hy+size,size),np.arange(0,hx+size,size)))
+        counts.append(np.sum(H>0))
+        sizes.append(size)
+        size *= 2
+        if counts[-1]<=1:
+            break
+    # linear regression
+    coeffs=np.polyfit(np.log(sizes), np.log(counts), 1)
+    return(-coeffs[0])
 
