@@ -36,17 +36,22 @@ If you are not sure, it is recommended to prepare the image in the NRRD format (
 - In addition, volumed annotated with PH cycles are produced.
 
 
-### Sample images
-Generation Labeling:
-<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/generation_labeling.png?raw=true" width="30%" />
-
-Persistence diagram:
-<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/persistence_diagram.png?raw=true" width="30%" />
-
-Visualisation of persistent homology cycles for radial distance transform:
-<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/radial_PH_cycle_visualisation?raw=true" width="30%" />
-
-Radial Distance Transform:
-<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/radial_distance_transform.png?raw=true" width="30%" />
-
-
+## Sample output
+<div>
+<figure>
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/generation_labeling.png?raw=true" width="30%" />
+<figcaption>Generation Labeling</figcaption>
+</figure>
+<figure>
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/persistence_diagram.png?raw=true" width="30%" />
+<figcaption>Persistence diagram</figcaption>
+</figure>
+<figure>
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/radial_PH_cycle_visualisation.png?raw=true" width="30%" />
+<figcaption>Visualisation of persistent homology cycles for radial distance transform</figcaption>
+</figure>
+<figure>
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/radial_distance_transform.png?raw=true" width="30%" />
+<figcaption>Radial Distance Transform</figcaption>
+</figure>
+</div>
