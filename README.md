@@ -13,7 +13,7 @@ MIT Licence
 - Dependent packages: install by
 ``` 
 pip install -U git+https://github.com/shizuo-kaji/CubicalRipser_3dim
-pip install scikit-fmm pynrrd persim skan
+pip install scikit-fmm pynrrd persim skan statsmodels
 ```
 
 ## Description
@@ -34,3 +34,19 @@ If you are not sure, it is recommended to prepare the image in the NRRD format (
 - The ductal volume corresponding to the skeletal tree is computed (roughly, the original volume minus those voxels in trachea or forming cycles)
 - Two types of distance transform are applied to the ductal volume, and their persistent homologies are computed.
 - In addition, volumed annotated with PH cycles are produced.
+
+
+### Sample images
+Generation Labeling:
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/generation_labeling.png?raw=true" width="30%" />
+
+Persistence diagram:
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/persistence_diagram.png?raw=true" width="30%" />
+
+Visualisation of persistent homology cycles for radial distance transform:
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/radial_PH_cycle_visualisation?raw=true" width="30%" />
+
+Radial Distance Transform:
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/master/image/radial_distance_transform.png?raw=true" width="30%" />
+
+

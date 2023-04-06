@@ -41,6 +41,10 @@ def compute_PH(dist_vol,CTID,maxdim=2,density=False, min_life=[], max_life=[], m
             H[mode] = PH
             hists = {}
             bins = {}
+            # filtering
+            PH=PH[(min_life[mode]<=life)&(life<=max_life[mode])&(birth<=max_birth[mode])]
+            life = np.abs(PH[:,2] - PH[:,1])
+            birth = np.abs(PH[:,1])
             hists['Life'], bins['Life'] = np.histogram(life,bins=num_bins[mode], range=(min_life[mode],max_life[mode]))
             hists['Birth'], bins['Birth'] = np.histogram(birth,bins=num_bins[mode], range=(0,max_birth[mode]))
             hists['Ratio'], bins['Ratio'] = np.histogram(life/np.abs(birth),bins=num_bins[mode], range=(0,1))
