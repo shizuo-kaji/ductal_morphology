@@ -43,7 +43,7 @@ If you are not sure, it is recommended to prepare the image in the NRRD format (
 <figcaption>Generation Labeling</figcaption>
 </figure>
 <figure>
-<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/persistence_diagram.png?raw=true" width="30%" />
+<img src="https://github.com/shizuo-kaji/ductal_morphology/blob/main/image/persistence_diagram.png?raw=true" width="50%" />
 <figcaption>Persistence diagram</figcaption>
 </figure>
 <figure>
