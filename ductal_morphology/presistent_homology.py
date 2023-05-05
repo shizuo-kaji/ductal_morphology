@@ -26,7 +26,7 @@ def compute_PH(CTID,dist_vol=None,maxdim=2, OUTSIDE=1, PH_dir={},recompute_PH=Tr
             # print("Betti numbers: ", gd.persistent_betti_numbers(np.inf,-np.inf))
         PH[mode] = PH[mode][PH[mode][:,2]<OUTSIDE] # remove cycles killed by outside region
         if verbosity>0:
-            print(f'{mode}: ', ''.join([f'betti {i} {sum(PH[mode][:,0]==i)}, ' for i in range(maxdim+1)]))
+            print(f'{mode}: ', ''.join([f'betti{i} {sum(PH[mode][:,0]==i)}, ' for i in range(maxdim+1)]))
         PH[mode] = PH[mode][PH[mode][:,0]==0] # focus on PH0
     return(PH)
 

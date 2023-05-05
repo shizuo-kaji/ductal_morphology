@@ -30,7 +30,7 @@ def ascending_flood(img,seed_point,tol=0, lo=-1000, high=1000):
     return(mask)
 
 # cycle annotated volume
-def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot_type, annot_metric, min_life=[], max_life=[], num_bins=[], verbosity=0, use_tqdm=True):
+def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot_type, annot_metric, min_life=[], max_life=[], min_birth=[], max_birth=[], num_bins=[], verbosity=0, use_tqdm=True):
     out = binarised_volume.copy().astype(np.uint8)
     vol = out.sum()
     dist_vol = geodesic_distance_transform(skeleton,binarised_volume,origin)
@@ -42,11 +42,11 @@ def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot
     # label classes
     char_cycles = []
     for i in range(num_bins[mode]):
-        if annot_metric == "birth":
-            char_cycles.append({'dim':0, 'b0':-metrics[f"{mode}_Birth_bin{i+1}"], 'b1':-metrics[f"{mode}_Birth_bin{i}"], 'l0':-np.inf, 'l1':np.inf, 'col': i+2 })
-        elif annot_metric == "life":
-            char_cycles.append({'dim':0, 'l0':metrics[f"{mode}_Life_bin{i}"], 'l1':metrics[f"{mode}_Life_bin{i+1}"], 'b0':-np.inf, 'b1':np.inf, 'col': i+2 })
-        elif annot_metric == "ratio":
+        if annot_metric == "Birth":
+            char_cycles.append({'dim':0, 'b0':metrics[f"{mode}_Birth_bin{i}"], 'b1':metrics[f"{mode}_Birth_bin{i+1}"], 'l0':min_life[mode], 'l1':max_life[mode], 'col': i+2 })
+        elif annot_metric == "Life":
+            char_cycles.append({'dim':0, 'l0':metrics[f"{mode}_Life_bin{i}"], 'l1':metrics[f"{mode}_Life_bin{i+1}"], 'b0':min_birth[mode], 'b1':max_birth[mode], 'col': i+2 })
+        elif annot_metric == "Ratio":
             char_cycles.append({'dim':0, 'l0':metrics[f"{mode}_Ratio_bin{i}"], 'l1':metrics[f"{mode}_Ratio_bin{i+1}"], 'b0':None, 'b1':None, 'col': i+2 })
             
     # counter for each label
@@ -58,11 +58,12 @@ def annotated_volume(binarised_volume, skeleton, origin, metrics, H, mode, annot
         # iterate over PH cycles
         for j,cc in enumerate(char_cycles):
             d,b0,b1,l0,l1 = cc['dim'],cc['b0'],cc['b1'],cc['l0'],cc['l1']
+            # excluded cycles
             if p[0] != d:
                 continue
-            if annot_metric=="ratio" and not (l1>=abs((p[2]-p[1])/p[1])>=l0):
+            if annot_metric=="Ratio" and not (l1>=abs((p[2]-p[1])/p[1])>=l0):
                 continue                
-            elif annot_metric!="ratio" and not ((l1>=p[2]-p[1]>=l0) and (b1>=p[1]>=b0)):
+            elif annot_metric!="Ratio" and not ((l1>=abs(p[2]-p[1])>=l0) and (b1>=abs(p[1])>=b0)):
                 continue
             # cycle to annotate
             bx,by,bz = p[3:6].astype(np.int32)

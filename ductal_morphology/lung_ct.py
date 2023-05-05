@@ -14,6 +14,8 @@ import networkx as nx
 from tqdm.auto import tqdm
 import pandas as pd
 
+TRACHEA_GEN = 100
+
 # find "fattest" node ID and its coordinates
 # * currently not used *
 def fattest_node(skeleton_img,mask,skel):
@@ -106,9 +108,12 @@ def find_trachea(skeleton_MST, min_branch_children=20, min_branch_separation=0, 
     degrees = np.array([skeleton_MST.degree[i] for i in skeleton_MST.nodes])
     c=vert_coords[degrees==1] # leaf coordinates
     # choose the leaf with minimum z-coordinates (should corresponds to throat) as the starting point
-    origin_id = list(skeleton_MST.nodes)[np.where(degrees==1)[0][np.argmin(c[:,0])]] 
+    entrance_node = list(skeleton_MST.nodes)[np.where(degrees==1)[0][np.argmin(c[:,0])]]
+    origin_id = entrance_node
     height = np.ptp(c[:,0])
-    trachea_nodes = [] # remove nodes in trachea
+    if verbosity>0:
+        print(f"Highest vert ID: {origin_id}, coord: {skeleton_MST.nodes[origin_id]['coords']}, height: {height}")
+    trachea_nodes = [] # nodes in trachea
     bfs = nx.bfs_successors(skeleton_MST,source=origin_id)
     bfsT= nx.bfs_tree(skeleton_MST,source=origin_id)
     # tree traversal
@@ -116,8 +121,6 @@ def find_trachea(skeleton_MST, min_branch_children=20, min_branch_separation=0, 
     origin_id,succ = next(bfs)
     for k in succ:
         parent[k]=origin_id
-    if verbosity>0:
-        print(f"Highest vert ID: {origin_id}, coord: {skeleton_MST.nodes[origin_id]['coords']}, height: {height}")
     while True: # identify the carina node
         if skeleton_MST.degree[origin_id] < 3: 
             #if skeleton_MST.coords[parent[origin_id]][0] <= skeleton_MST.coords[origin_id][0]:
@@ -183,17 +186,19 @@ def find_trachea(skeleton_MST, min_branch_children=20, min_branch_separation=0, 
             parent[k]=origin_id
         if verbosity>1:
             print(f"traversing node {origin_id} at {skeleton_MST.nodes[origin_id]['coords']} with childeren {succ}")
-    return(origin_id,trachea_nodes)        
+    return(origin_id,entrance_node,trachea_nodes)        
 
 # remove degree two nodes and degree one nodes (leafs) with small generation.
-def removed_deg2_nodes(skeleton_MST, carina_id, leaf_removal_max_generation=3, verbosity=0):
+def removed_deg2_nodes(skeleton_MST, carina_id, keep_nodes=[], leaf_removal_max_generation=3, verbosity=0):
     node_removed = True
     removed_deg2, removed_leaf = 0,0
     while node_removed:
         node_removed = False
         gens = nx.shortest_path_length(skeleton_MST, source=carina_id, weight=None)
         for node in skeleton_MST.nodes():
-            if skeleton_MST.degree(node) == 1 and node != carina_id and gens[node]<= leaf_removal_max_generation:
+            if node in keep_nodes:
+                continue
+            elif skeleton_MST.degree(node) == 1 and node != carina_id and gens[node]<= leaf_removal_max_generation:
                 skeleton_MST.remove_node(node)            
                 node_removed = True
                 removed_leaf += 1
@@ -252,7 +257,7 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     skeleton_dt = distance_transform_edt(~skeleton_cleaned) # this will be compared to determine the voxels to be removed from the original volume
 
     ## identify trachea carina as the first deg>2 node with enough children
-    carina_id, trachea_nodes = find_trachea(skeleton_MST, min_branch_children=min_branch_children, min_branch_separation=min_branch_separation, verbosity=verbosity)
+    carina_id, entrance_node, trachea_nodes = find_trachea(skeleton_MST, min_branch_children=min_branch_children, min_branch_separation=min_branch_separation, verbosity=verbosity)
     if verbosity>0:
         print(f"Trachea Carina ID {carina_id} at {skeleton_MST.nodes[carina_id]['coords']}") # skeleton_MST[k]
     ## construct the airway tree rooted at the trachea carina: remove vertices in trachea
@@ -262,7 +267,8 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     #nx.write_gexf(skeleton_MST, "MST2.gexf")
     cc = max(nx.connected_components(skeleton_MST), key=len) # take the largest connected component
     if verbosity>1:
-        print("removed vertices in the trachea: ",MST_nodes-set(cc), [(k,skel.coordinates[k].astype(int)) for k in trachea_nodes])
+        print("vertices in the trachea: ", [(k,skel.coordinates[k].astype(int)) for k in trachea_nodes])
+        print("removed nodes: ",MST_nodes-set(cc))
         # coord_nodes = skeleton_MST.coords[degrees!=2]
         # for x in list(set(skeleton_MST.nodes())-set(cc)):
         #     dist = ((skeleton_MST.coords[x]-coord_nodes)**2).sum(axis=1)
@@ -272,7 +278,8 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     if verbosity>1:
         print(f'skeleton graph after trachea removal: #vertices {len(skeleton_MST.nodes())}, #edges {len(skeleton_MST.edges())}')
     ## remove degree two nodes once again (except for the root) and leaf nodes with small generation
-    skeleton_MST,gens = removed_deg2_nodes(skeleton_MST, carina_id, leaf_removal_max_generation=2, verbosity=verbosity)
+    keep_nodes = [] if remove_trachea else [entrance_node]
+    skeleton_MST,gens = removed_deg2_nodes(skeleton_MST, carina_id, keep_nodes=keep_nodes, leaf_removal_max_generation=2, verbosity=verbosity)
     # airway conunt by generations
     ac_gens = {}
     i=0
@@ -284,6 +291,10 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
         i += 1
     if verbosity>0:
         print(f"#nodes at each generation: {ac_gens}")
+    # set generation for trachea nodes to 0
+    for node in trachea_nodes:
+        if node in skeleton_MST.nodes():
+            gens[node]=TRACHEA_GEN
     # final data
     attr = {node: {'gen':gens[node], 'deg':skeleton_MST.degree(node)} for node in skeleton_MST}
     nx.set_node_attributes(skeleton_MST,attr)
@@ -302,7 +313,8 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
     if skimage.measure.label(skeleton_generation>0).max()>1:
         print("the final skeleton is disconnected!")
 
-    ## identify voxels corresponding to trachea and remove them: those voxels having different distance from the original and the final tree centerlines will be removed
+    ## identify voxels corresponding to trachea and remove them
+    ## those voxels having different distance from the original and the final tree centerlines will be removed
     skeleton_MST_dt,inds = distance_transform_edt(skeleton_generation==0,return_indices=True)
     binarised_volume = largest_connected_component(binary_fill_holes((np.abs(skeleton_dt-skeleton_MST_dt)<distance_error_threshold) & binarised_volume))
     #binarised_volume = binary_fill_holes((skeleton_dt == skeleton_MST_dt) & binarised_volume)
