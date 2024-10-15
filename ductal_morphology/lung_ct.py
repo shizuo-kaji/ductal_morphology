@@ -180,7 +180,7 @@ def find_trachea(skeleton_MST, min_branch_children=20, min_branch_separation=0, 
         try:
             origin_id,succ = next(bfs)
         except StopIteration:
-            print("Cannot find trachea carina!")
+            Exception("Cannot find trachea carina!")
             break
         for k in succ:
             parent[k]=origin_id
@@ -189,7 +189,7 @@ def find_trachea(skeleton_MST, min_branch_children=20, min_branch_separation=0, 
     return(origin_id,entrance_node,trachea_nodes)        
 
 # remove degree two nodes and degree one nodes (leafs) with small generation.
-def removed_deg2_nodes(skeleton_MST, carina_id, keep_nodes=[], leaf_removal_max_generation=3, verbosity=0):
+def remove_deg2_nodes(skeleton_MST, carina_id, keep_nodes=[], leaf_removal_max_generation=3, verbosity=0):
     node_removed = True
     removed_deg2, removed_leaf = 0,0
     while node_removed:
@@ -279,7 +279,10 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
         print(f'skeleton graph after trachea removal: #vertices {len(skeleton_MST.nodes())}, #edges {len(skeleton_MST.edges())}')
     ## remove degree two nodes once again (except for the root) and leaf nodes with small generation
     keep_nodes = [] if remove_trachea else [entrance_node]
-    skeleton_MST,gens = removed_deg2_nodes(skeleton_MST, carina_id, keep_nodes=keep_nodes, leaf_removal_max_generation=2, verbosity=verbosity)
+    try:
+        skeleton_MST,gens = remove_deg2_nodes(skeleton_MST, carina_id, keep_nodes=keep_nodes, leaf_removal_max_generation=2, verbosity=verbosity)
+    except:
+        raise ValueError('"min_branch_children" may be too big for this volume. Reducing the value may fix the error.')
     # airway conunt by generations
     ac_gens = {}
     i=0
@@ -301,7 +304,7 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
 
     origin = tuple(skeleton_MST.nodes[carina_id]['coords']) # origin(=trachea carina) coordinates for geodesic distance for treeH
     if binarised_volume[origin]==0:
-        print("The root must lie inside the ductal structure!")
+        Exception("The root must lie inside the ductal structure!")
 
     ## assign airway generation to the skeleton tree
     skeleton_generation = np.zeros(skeleton.shape,dtype=np.uint16)
@@ -309,7 +312,8 @@ def create_generation_volumes(volume,skeletonize_method=None, graph_creation="ne
         voxels = nx.shortest_path(skeleton_graph,e[0],e[1])  # node indices contained in the path
         c = np.array([skel.coordinates[v] for v in voxels],dtype=int) # node coordinates contained in the path
         skeleton_generation[c[:,0],c[:,1],c[:,2]]=max(gens[e[0]],gens[e[1]])
-    print(f'Final graph: maximum generation {skeleton_generation.max()}, #connected components {skimage.measure.label(skeleton_generation>0).max()}, #vertices {len(skeleton_MST.nodes())}, #edges {len(skeleton_MST.edges())}, #leaves {sum([i[1]==1 for i in skeleton_MST.degree])}')
+    if verbosity>0:
+        print(f'Final graph: maximum generation {skeleton_generation.max()}, #connected components {skimage.measure.label(skeleton_generation>0).max()}, #vertices {len(skeleton_MST.nodes())}, #edges {len(skeleton_MST.edges())}, #leaves {sum([i[1]==1 for i in skeleton_MST.degree])}')
     if skimage.measure.label(skeleton_generation>0).max()>1:
         print("the final skeleton is disconnected!")
 
@@ -339,7 +343,7 @@ def skeleton_radius(skeleton,binarised_volume):
 # compute the geodesic disntance from the specified point or volume
 def distance_from_origin(binarised_volume,origin,fill_value=-1):
     if len(origin) <=3:
-        roi = np.zeros(binarised_volume.shape, dtype=np.bool)
+        roi = np.zeros(binarised_volume.shape, dtype=bool)
         roi[origin] = 1
     else:
         roi = origin
@@ -363,7 +367,7 @@ def tapering_coeff(skeleton,binarised_volume,origin,min_radius=0):
     df_rd = pd.DataFrame({'radius': radius[mask].ravel(), 'log_radius': np.log(radius[mask].ravel()), 'dist': distance[mask].ravel()})
     model = sm.OLS(df_rd['log_radius'], sm.add_constant(df_rd['dist']))
     res = model.fit()
-    return(df_rd,res.params[1], res.mse_resid)
+    return(df_rd,res.params.iloc[1], res.mse_resid)
 
 # box-couting dimension of a volume
 def box_counting_dim(binarised_volume):
